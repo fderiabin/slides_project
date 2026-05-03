@@ -1,7 +1,7 @@
 """
 02_tissue_mask.py — Generate a binary tissue mask from a whole-slide image
-using Otsu thresholding on a low-resolution level, with cleanup steps to
-exclude ink markers and edge artifacts.
+using Otsu thresholding plus connected-component filtering to remove ink
+markers, dust specks, and other non-tissue artifacts.
 
 Usage:
     python scripts/02_tissue_mask.py data/tumor/tumor_001.tif
@@ -14,14 +14,16 @@ from pathlib import Path
 import numpy as np
 import openslide
 from PIL import Image
-from skimage.color import rgb2gray, rgb2hsv
+from skimage.color import rgb2gray
 from skimage.filters import threshold_otsu
-from skimage.morphology import binary_closing, binary_opening, disk
+from skimage.morphology import (
+    binary_closing, binary_opening, disk, remove_small_objects
+)
 
 
 def generate_tissue_mask(slide_path: Path, output_dir: Path,
                          mask_level: int | None = None,
-                         min_saturation: float = 0.05) -> None:
+                         min_object_size: int = 5000) -> None:
     slide = openslide.OpenSlide(str(slide_path))
 
     if mask_level is None:
@@ -34,25 +36,23 @@ def generate_tissue_mask(slide_path: Path, output_dir: Path,
     region = slide.read_region((0, 0), mask_level, (width, height))
     rgb = np.array(region.convert("RGB"))
 
-    # Otsu on luminance: tissue is darker than the white-ish background
+    # Otsu on luminance: tissue (and ink) is darker than background
     gray = rgb2gray(rgb)
     threshold = threshold_otsu(gray)
     tissue = gray < threshold
     print(f"Otsu threshold: {threshold:.3f}")
-    print(f"After Otsu:                  {tissue.mean():.1%} flagged")
+    print(f"After Otsu:                 {tissue.mean():.1%} flagged")
 
-    # Reject low-saturation pixels (ink markers, dark scanner artifacts).
-    # H&E stain has high saturation; ink and shadows are near-grey.
-    hsv = rgb2hsv(rgb)
-    saturation = hsv[..., 1]
-    is_stained = saturation > min_saturation
-    tissue = tissue & is_stained
-    print(f"After saturation filter:     {tissue.mean():.1%} flagged")
+    # Morphological cleanup: close small holes, smooth edges
+    tissue = binary_closing(tissue, disk(4))
+    tissue = binary_opening(tissue, disk(2))
+    print(f"After morphology:           {tissue.mean():.1%} flagged")
 
-    # Morphological cleanup
-    tissue = binary_closing(tissue, disk(4))   # fill small holes inside tissue
-    tissue = binary_opening(tissue, disk(5))   # remove specks and ink remnants
-    print(f"After morphological cleanup: {tissue.mean():.1%} flagged")
+    # Connected-component size filter: remove anything too small to be tissue.
+    # This eliminates ink markers, dust specks, and isolated artifacts.
+    tissue = remove_small_objects(tissue, min_size=min_object_size)
+    print(f"After size filter (>={min_object_size}px): "
+          f"{tissue.mean():.1%} flagged")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = slide_path.stem
@@ -76,19 +76,19 @@ def generate_tissue_mask(slide_path: Path, output_dir: Path,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("slide", type=Path, help="Path to a .tif WSI")
+    parser.add_argument("slide", type=Path)
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
     parser.add_argument("--mask-level", type=int, default=None)
-    parser.add_argument("--min-saturation", type=float, default=0.05,
-                        help="Pixels below this HSV saturation are excluded "
-                             "(removes ink markers; default 0.05)")
+    parser.add_argument("--min-object-size", type=int, default=5000,
+                        help="Minimum connected-component size in pixels "
+                             "(default 5000; raise for tighter filtering)")
     args = parser.parse_args()
 
     if not args.slide.exists():
         sys.exit(f"Error: {args.slide} does not exist")
 
     generate_tissue_mask(args.slide, args.output_dir,
-                         args.mask_level, args.min_saturation)
+                         args.mask_level, args.min_object_size)
 
 
 if __name__ == "__main__":
