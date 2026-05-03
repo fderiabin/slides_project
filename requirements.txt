@@ -1,0 +1,11 @@
+openslide-python
+openslide-bin
+Pillow
+numpy
+matplotlib
+scikit-image
+torch
+torchvision
+opencv-python
+transformers
+scikit-learn
