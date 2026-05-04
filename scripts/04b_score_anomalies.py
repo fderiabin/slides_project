@@ -49,9 +49,7 @@ def score_anomalies(reference_slide: Path, target_slide: Path,
     print(f"Reference features: {ref_feats.shape}")
     print(f"Target features:    {tgt_feats.shape}")
 
-    # Cosine distance == 1 - cosine similarity. With L2-normalised vectors,
-    # Euclidean distance is monotonically related to cosine distance, so
-    # sklearn's brute-force Euclidean k-NN gives the same ranking.
+    # Cosine distance: 1 - cosine similarity. Higher score = more dissimilar.
     print(f"Computing {k}-nearest-neighbour distances...")
     nn = NearestNeighbors(n_neighbors=k, metric="cosine", algorithm="brute")
     nn.fit(ref_feats)
@@ -92,9 +90,6 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
     parser.add_argument("-k", "--k-neighbors", type=int, default=5)
     args = parser.parse_args()
-
-    if "scikit-learn" not in [m.lower() for m in []]:  # placeholder, see note
-        pass
 
     score_anomalies(args.reference, args.target, args.output_dir,
                     args.k_neighbors)

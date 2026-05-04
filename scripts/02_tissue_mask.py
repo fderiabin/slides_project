@@ -17,13 +17,13 @@ from PIL import Image
 from skimage.color import rgb2gray
 from skimage.filters import threshold_otsu
 from skimage.morphology import (
-    binary_closing, binary_opening, disk, remove_small_objects
+    closing, opening, disk, remove_small_objects
 )
 
 
 def generate_tissue_mask(slide_path: Path, output_dir: Path,
                          mask_level: int | None = None,
-                         min_object_size: int = 5000) -> None:
+                         min_object_size: int = 15000) -> None:
     slide = openslide.OpenSlide(str(slide_path))
 
     if mask_level is None:
@@ -44,8 +44,8 @@ def generate_tissue_mask(slide_path: Path, output_dir: Path,
     print(f"After Otsu:                 {tissue.mean():.1%} flagged")
 
     # Morphological cleanup: close small holes, smooth edges
-    tissue = binary_closing(tissue, disk(4))
-    tissue = binary_opening(tissue, disk(2))
+    tissue = closing(tissue, disk(4))
+    tissue = opening(tissue, disk(2))
     print(f"After morphology:           {tissue.mean():.1%} flagged")
 
     # Connected-component size filter: remove anything too small to be tissue.
@@ -79,7 +79,7 @@ def main() -> None:
     parser.add_argument("slide", type=Path)
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
     parser.add_argument("--mask-level", type=int, default=None)
-    parser.add_argument("--min-object-size", type=int, default=5000,
+    parser.add_argument("--min-object-size", type=int, default=15000,
                         help="Minimum connected-component size in pixels "
                              "(default 5000; raise for tighter filtering)")
     args = parser.parse_args()

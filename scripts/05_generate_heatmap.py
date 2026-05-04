@@ -14,9 +14,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import openslide
-from matplotlib.colors import Normalize
-from PIL import Image
-
 
 def generate_heatmap(slide_path: Path, output_dir: Path,
                      tile_level: int = 1, tile_size: int = 256,
@@ -109,7 +106,7 @@ def main() -> None:
         sys.exit(f"Error: {args.slide} does not exist")
 
     generate_heatmap(args.slide, args.output_dir,
-                     args.tile_level, args.tile_size, args.thumbnail_level)
+                     args.tile_level, args.tile_size, args.thumbwnail_level)
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ def tile_slide(slide_path: Path,
                output_dir: Path,
                tile_level: int = 1,
                tile_size: int = 256,
-               tissue_threshold: float = 0.5) -> None:
+               tissue_threshold: float = 0.85) -> None:
 
     slide = openslide.OpenSlide(str(slide_path))
     stem = slide_path.stem
