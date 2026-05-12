@@ -38,7 +38,7 @@ class TileDataset(Dataset):
         return len(self.filenames)
 
     def __getitem__(self, idx: int):
-        img = Image.open(self.tile_dir / self.filenames[idx]).convert("RGB")
+        img = Image.open(self.tile_dir / self.filenames[idx]).convert("RGB") 
         # The processor handles resize + normalisation. It returns a dict
         # of tensors; we want pixel_values, shape (1, 3, 224, 224).
         pixel_values = self.processor(img, return_tensors="pt")["pixel_values"]

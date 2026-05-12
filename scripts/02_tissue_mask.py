@@ -24,17 +24,16 @@ from skimage.morphology import (
 def generate_tissue_mask(slide_path: Path, output_dir: Path,
                          mask_level: int | None = None,
                          min_object_size: int = 15000) -> None:
-    slide = openslide.OpenSlide(str(slide_path))
+    with openslide.OpenSlide(str(slide_path)) as slide:
+        if mask_level is None:
+            mask_level = slide.level_count - 4
+        mask_level = max(0, min(mask_level, slide.level_count - 1))
 
-    if mask_level is None:
-        mask_level = slide.level_count - 4
-    mask_level = max(0, min(mask_level, slide.level_count - 1))
+        width, height = slide.level_dimensions[mask_level]
+        print(f"Reading level {mask_level}: {width} x {height} pixels")
 
-    width, height = slide.level_dimensions[mask_level]
-    print(f"Reading level {mask_level}: {width} x {height} pixels")
-
-    region = slide.read_region((0, 0), mask_level, (width, height))
-    rgb = np.array(region.convert("RGB"))
+        region = slide.read_region((0, 0), mask_level, (width, height))
+        rgb = np.array(region.convert("RGB"))
 
     # Otsu on luminance: tissue (and ink) is darker than background
     gray = rgb2gray(rgb)
@@ -71,8 +70,6 @@ def generate_tissue_mask(slide_path: Path, output_dir: Path,
     Image.fromarray(overlay).save(overlay_png)
     print(f"Overlay PNG saved: {overlay_png}")
 
-    slide.close()
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -81,7 +78,7 @@ def main() -> None:
     parser.add_argument("--mask-level", type=int, default=None)
     parser.add_argument("--min-object-size", type=int, default=15000,
                         help="Minimum connected-component size in pixels "
-                             "(default 5000; raise for tighter filtering)")
+                             "(default 15000; raise for tighter filtering)")
     args = parser.parse_args()
 
     if not args.slide.exists():

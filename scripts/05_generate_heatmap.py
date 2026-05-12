@@ -106,7 +106,7 @@ def main() -> None:
         sys.exit(f"Error: {args.slide} does not exist")
 
     generate_heatmap(args.slide, args.output_dir,
-                     args.tile_level, args.tile_size, args.thumbwnail_level)
+                     args.tile_level, args.tile_size, args.thumbnail_level)
 
 
 if __name__ == "__main__":
