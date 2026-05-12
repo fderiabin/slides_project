@@ -9,6 +9,16 @@ Built as a portfolio project to demonstrate end-to-end whole-slide image
 processing on Linux: OpenSlide, foundation-model feature extraction
 (Phikon / Owkin ViT-Base), GPU inference, and quantitative validation.
 
+![Validation figure for tumor_001: thumbnail, anomaly heatmap, overlay,
+and overlay with ground-truth tumour polygons in
+magenta.](docs/tumor_001_validation.jpg)
+
+*Left to right: slide thumbnail, anomaly-score heatmap, heatmap overlay,
+and overlay with the CAMELYON16 ground-truth tumour polygons (magenta).
+Hottest tiles cluster around tissue edges throughout the upper blobs
+(geometric noise) but also pick out the right-side polygon interior in
+the lower blobs — the source of the 83% recall at 13% precision below.*
+
 ## Result on `tumor_001`
 
 | Metric | Value |
@@ -31,6 +41,16 @@ honest v1 finding. A supervised classifier on the same Phikon features
 
 ## Pipeline
 
+```mermaid
+flowchart LR
+    A["01<br/>inspect_slide"] --> B["02<br/>tissue_mask"]
+    B --> C["03<br/>tile_slide"]
+    C --> D["04a<br/>extract_features<br/>(Phikon)"]
+    D --> E["04b<br/>score_anomalies<br/>(k-NN cosine)"]
+    E --> F["05<br/>generate_heatmap"]
+    F --> G["05b<br/>validate_annotations"]
+```
+
 | # | Script | Job |
 |---|---|---|
 | 1 | `01_inspect_slide.py` | Print slide metadata, save thumbnail |
@@ -44,7 +64,9 @@ honest v1 finding. A supervised classifier on the same Phikon features
 Each script is independently invokable and writes its outputs to
 `output/`, keyed by the slide stem (e.g. `tumor_001`). The contract
 between steps is a small set of conventions documented in
-[`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md).
+[`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md); the conceptual material
+(OpenSlide, Otsu, ViT internals, k-NN, etc.) lives in
+[`THINGS_I_LEARNED.md`](THINGS_I_LEARNED.md).
 
 ## Installation
 
@@ -109,8 +131,8 @@ to end in under 10 minutes.
 
 ## Design decisions
 
-The deeper rationale and debugging anecdotes live in
-[`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md). The headline choices:
+The deeper rationale lives in [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md).
+The headline choices:
 
 - **Level 1, not level 0** for tiling. Phikon was trained at ~20×
   equivalent; level 1 of a 40× scan gives the model the field of view
@@ -145,6 +167,34 @@ where `hot` is the top 5% of anomaly scores across the slide, and
 The output figure has four panels: thumbnail, heatmap alone, heatmap
 overlay, heatmap overlay with the polygons drawn as magenta outlines.
 
+## Debugging anecdotes
+
+Two episodes from the build that illustrate how the current defaults
+were reached.
+
+**The saturation-thresholding dud.** First attempt at removing the two
+ink-cross markers on `tumor_001` assumed "ink should be near-grey, low
+saturation" and tried HSV thresholding. Partial success at
+`min_saturation=0.05`, no improvement at 0.15. A direct pixel-level
+measurement on the ink showed median saturation 0.27 — squarely inside
+the H&E tissue range. Philips printer ink is bluish-black, not grey;
+chromaticity isn't the discriminator. The fix was to switch to a
+connected-component **size** filter (default
+`min_object_size=15000`): tissue blobs are 20,000+ pixels, ink crosses
+are 9,000–12,000. More general because it doesn't assume anything
+about colour or marker placement.
+
+**The orientation confusion.** A diagnostic for "are the ink crosses
+still in the mask?" used `mask[:int(h*0.1)]` to check the top 10% of
+rows. The reading came back at 8% coverage — identical to the total
+mask coverage — and was briefly misinterpreted as "the entire mask is
+in the top 10%." Real explanation: the slide is portrait-oriented, the
+tissue happens to occupy the middle bands, and the top-10% reading was
+correctly counting just the ink markers. A row-by-row coverage
+histogram across 10 bands made the layout obvious. Lesson: validate
+slice-based diagnostics with a multi-band sweep before drawing
+conclusions.
+
 ## Known limitations
 
 - **Single normal reference.** A larger reference set would partially
@@ -174,8 +224,9 @@ slides_project/
 ├── scripts/             Pipeline scripts (01–05b)
 ├── data/                CAMELYON16 slides + annotations (gitignored)
 ├── output/              Tiles, features, masks, heatmaps (gitignored)
+├── docs/                Static images referenced by the README
 ├── PROJECT_CONTEXT.md   Architecture, design decisions, open questions
-├── LEARNING_NOTES.md    Conceptual reference (OpenSlide, Otsu, Phikon, etc.)
+├── THINGS_I_LEARNED.md  Conceptual reference (OpenSlide, Otsu, Phikon, etc.)
 └── requirements.txt
 ```
 
