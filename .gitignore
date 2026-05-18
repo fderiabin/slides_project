@@ -21,3 +21,9 @@ Thumbs.db
 .idea/
 *.swp
 .claude/
+
+# Internal working docs
+ARCHITECTURE_REVIEW.md
+PROJECT_3_MAKEFILES.md
+RESUME_CONTEXT.md
+SETUP_RUNBOOK.md

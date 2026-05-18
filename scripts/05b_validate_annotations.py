@@ -183,7 +183,7 @@ def main() -> None:
     parser.add_argument("slide", type=Path)
     parser.add_argument("--annotation", type=Path, default=None,
                         help="ASAP XML file. Default: "
-                             "data/annotations/<stem>.xml")
+                             "~/projects/pathology/shared/slides/<stem>.xml")
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
     parser.add_argument("--tile-level", type=int, default=1)
     parser.add_argument("--tile-size", type=int, default=256)
@@ -199,7 +199,8 @@ def main() -> None:
 
     annotation = args.annotation
     if annotation is None:
-        annotation = Path("data/annotations") / f"{args.slide.stem}.xml"
+        annotation = (Path.home() / "projects/pathology/shared/slides"
+                      / f"{args.slide.stem}.xml")
 
     validate_annotations(args.slide, annotation, args.output_dir,
                          args.tile_level, args.tile_size,
